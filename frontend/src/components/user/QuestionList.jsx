@@ -1,0 +1,1 @@
+export default function QuestionList() { return <div>Lista de questões</div>; }

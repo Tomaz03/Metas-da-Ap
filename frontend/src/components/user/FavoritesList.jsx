@@ -1,0 +1,1 @@
+export default function FavoritesList() { return <div>Favoritas</div>; }

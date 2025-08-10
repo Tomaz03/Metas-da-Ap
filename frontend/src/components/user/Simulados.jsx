@@ -1,0 +1,1 @@
+export default function Simulados() { return <div>Simulados</div>; }
