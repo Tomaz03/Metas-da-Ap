@@ -1,23 +1,26 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from ..schemas import SimuladoConfigSchema, QuestaoFeedback
+from .. import crud, schemas, models 
+from ..auth import get_current_user 
+from ..database import get_db 
 from datetime import datetime, timedelta
 import random
 import json
-from backend import crud, models, schemas
-from backend.auth import get_current_user
-from backend.database import get_db
 
 router = APIRouter()
 
 @router.post("/api/simulados/generate/")
-def gerar_simulado(payload: schemas.SimuladoConfigSchema, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
+def gerar_simulado(payload: SimuladoConfigSchema, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
     todas_questoes = []
     questoes_ids_selecionadas = []
 
     for config in payload.materias_config:
         # Montar filtros adicionais
+
         filtros_adicionais = config.additional_filters or {}
+
         questoes = crud.get_questions(
             db=db,
             materia=config.materia,
@@ -49,177 +52,203 @@ def gerar_simulado(payload: schemas.SimuladoConfigSchema, db: Session = Depends(
             "content": crud.strip_p_tags(q.enunciado),
             "alternativas": alternativas_formatadas, 
             "correct_alternative_id": correta_id_mapeada,  
-            "materia": q.materia,
-            "assunto": q.assunto,
-            "tipo": crud.obter_tipo_por_materia(q.materia)
+            "materia": q.materia, 
+            "assunto": q.assunto, 
+            "tipo": crud.obter_tipo_por_materia(q.materia) 
         })
+
     initial_simulado = models.Simulado(
         user_id=current_user.id,
-        tempo_limite=payload.tempo_limite_minutos * 60,
+        tempo_limite=payload.tempo_limite_minutos * 60, 
         total_questoes=len(todas_questoes),
-        questoes_ids=json.dumps(questoes_ids_selecionadas), # Correctly convert to JSON string
-        acertos_total=0,
-        erros_total=0,
-        percentual_acerto=0.0,
-        acertos_basicos=0,
-        erros_basicos=0,
-        acertos_especificos=0,
-        erros_especificos=0,
-        questoes_respondidas=0,
-        tempo_utilizado=0,
-        data_realizacao=datetime.utcnow()
+        questoes_ids=questoes_ids_selecionadas,
+        acertos_total=0, erros_total=0, percentual_acerto=0.0,
+        acertos_basicos=0, erros_basicos=0, acertos_especificos=0, erros_especificos=0,
+        acertos_por_materia={}, erros_por_materia={},
+        acertos_por_assunto={}, erros_por_assunto={},
+        respostas_usuario={}
     )
-
     db.add(initial_simulado)
     db.commit()
     db.refresh(initial_simulado)
-    
-    return schemas.SimuladoCreatedResponse(
-        id=initial_simulado.id,
-        questoes=questoes_formatadas,
-        tempo_limite_minutos=payload.tempo_limite_minutos,
-        status="criado"
-    )
 
-@router.post("/api/simulados/submit/{simulado_id}")
-def submeter_simulado(
+    response_data = {
+        "tempo_limite_minutos": payload.tempo_limite_minutos,
+        "simulado_id": initial_simulado.id, 
+        "questoes": questoes_formatadas
+    }
+    
+    print("DEBUG: Dados do simulado gerados (antes de enviar para o frontend):")
+    print(json.dumps(response_data, indent=2, ensure_ascii=False))
+
+    return response_data
+
+@router.post("/api/simulados/{simulado_id}/submit/", response_model=schemas.ResultadoSimulado) 
+def submit_simulado(
     simulado_id: int,
-    respostas: List[schemas.QuestaoFeedback],
+    submission: schemas.SubmitRequest,
     db: Session = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user)
 ):
-    simulado = crud.get_simulado_by_id(db, simulado_id, current_user.id)
-    if not simulado:
-        raise HTTPException(status_code=404, detail="Simulado não encontrado.")
-
-    if simulado.status == "finalizado":
-        raise HTTPException(status_code=400, detail="Simulado já foi finalizado.")
-
+    total = len(submission.answers)
     acertos = 0
     erros = 0
-    acertos_basicos = 0
-    erros_basicos = 0
-    acertos_especificos = 0
-    erros_especificos = 0
-    
-    # Mapear as respostas do usuário para facilitar a busca
-    respostas_map = {r.questao_id: r.resposta_usuario for r in respostas}
-    
-    # Buscar todas as questões do simulado de uma vez
-    questoes_ids = json.loads(simulado.questoes_ids) if isinstance(simulado.questoes_ids, str) else simulado.questoes_ids
-    questoes = db.query(models.Question).filter(models.Question.id.in_(questoes_ids)).all()
-    
-    questoes_map = {q.id: q for q in questoes}
+    feedback = []
 
-    for questao_id, resposta_usuario in respostas_map.items():
-        questao = questoes_map.get(questao_id)
+    simulado = crud.get_simulado(db, simulado_id=simulado_id)
+    if not simulado or simulado.user_id != current_user.id: 
+        raise HTTPException(status_code=404, detail="Simulado não encontrado ou você não tem permissão.")
+    
+    tempo_limite_segundos = simulado.tempo_limite 
+
+    question_ids_in_submission = [r.question_id for r in submission.answers]
+    questions_map = {
+        q.id: q for q in db.query(models.Question)
+                             .filter(models.Question.id.in_(question_ids_in_submission))
+                             .all()
+    }
+
+    for resposta in submission.answers:
+        questao = questions_map.get(resposta.question_id)
         if not questao:
-            continue
+            continue 
 
-        gabarito = crud.mapear_gabarito_para_indice(questao.gabarito, questao.tipo)
+        correct_alternative_id_mapped = crud.mapear_gabarito_para_indice(questao.gabarito)
 
-        if resposta_usuario is not None and resposta_usuario == gabarito:
+        user_selected_alternative_id_mapped = None
+        if resposta.selected_alternative_id is not None and resposta.selected_alternative_id != -1:
+            user_selected_alternative_id_mapped = resposta.selected_alternative_id + 1
+
+        is_correct = (user_selected_alternative_id_mapped == correct_alternative_id_mapped)
+
+        if is_correct:
             acertos += 1
-            if crud.obter_tipo_por_materia(questao.materia) == "basico":
-                acertos_basicos += 1
-            else:
-                acertos_especificos += 1
         else:
             erros += 1
-            if crud.obter_tipo_por_materia(questao.materia) == "basico":
-                erros_basicos += 1
-            else:
-                erros_especificos += 1
 
-    percentual_acerto = (acertos / simulado.total_questoes) * 100 if simulado.total_questoes > 0 else 0
+        alternativas_formatted = crud.transformar_alternativas(questao)
 
-    # Atualizar o simulado
-    simulado.acertos_total = acertos
-    simulado.erros_total = erros
-    simulado.acertos_basicos = acertos_basicos
-    simulado.erros_basicos = erros_basicos
-    simulado.acertos_especificos = acertos_especificos
-    simulado.erros_especificos = erros_especificos
-    simulado.percentual_acerto = percentual_acerto
-    simulado.questoes_respondidas = len(respostas)
-    simulado.data_submissao = datetime.utcnow()
-    simulado.status = "finalizado"
+        feedback.append(QuestaoFeedback(
+            question_id=questao.id,
+            content=crud.strip_p_tags(questao.enunciado),
+            alternatives=alternativas_formatted,
+            selected_alternative_id=resposta.selected_alternative_id,
+            correct_alternative_id=correct_alternative_id_mapped,
+            is_correct=is_correct
+        ))
 
-    db.commit()
-    db.refresh(simulado)
+    percentual = (acertos / total) * 100 if total > 0 else 0.0
 
-    return {"message": "Simulado submetido com sucesso", "simulado_id": simulado.id, "percentual_acerto": simulado.percentual_acerto}
+    simulado_id_salvo = crud.salvar_simulado(
+        db=db,
+        user_id=current_user.id,
+        tempo_limite=tempo_limite_segundos, 
+        tempo_utilizado=submission.time_taken_seconds,
+        respostas_raw=submission.answers,
+        feedback_questoes=feedback,
+        acertos=acertos,
+        erros=erros,
+        percentual=percentual
+    )
 
-
-@router.get("/api/simulados/list/")
-def listar_simulados(
-    db: Session = Depends(get_db),
-    current_user: schemas.User = Depends(get_current_user)
-):
-    simulados = crud.get_user_simulados(db, current_user.id)
-    return [schemas.SimuladoOverview.from_orm(s) for s in simulados]
-
-
-@router.get("/api/simulados/statistics/")
-def get_user_simulado_statistics(
-    db: Session = Depends(get_db),
-    current_user: schemas.User = Depends(get_current_user)
-):
-    simulados = crud.get_user_simulados(db, current_user.id)
+    simulado_completo = db.query(models.Simulado).filter(models.Simulado.id == simulado_id_salvo).first()
     
+    if not simulado_completo:
+        raise HTTPException(status_code=500, detail="Erro ao recuperar o simulado salvo.")
+
+    return schemas.ResultadoSimulado(
+        tempo_limite=simulado_completo.tempo_limite,
+        tempo_utilizado=simulado_completo.tempo_utilizado,
+        acertos_total=simulado_completo.acertos_total,
+        erros_total=simulado_completo.erros_total,
+        percentual_acerto=simulado_completo.percentual_acerto,
+        feedback_questoes=feedback,
+        acertos_basicos=simulado_completo.acertos_basicos,
+        erros_basicos=simulado_completo.erros_basicos,
+        acertos_especificos=simulado_completo.acertos_especificos,
+        erros_especificos=simulado_completo.erros_especificos,
+        acertos_por_materia=simulado_completo.acertos_por_materia,
+        erros_por_materia=simulado_completo.erros_por_materia,
+        acertos_por_assunto=simulado_completo.acertos_por_assunto,
+        erros_por_assunto=simulado_completo.erros_por_assunto,
+    )
+
+@router.get("/api/simulados/stats", response_model=schemas.SimuladoStatisticsResponse) 
+def obter_estatisticas_simulados(
+    dias: Optional[int] = Query(None, description="Filtrar pelos últimos X dias"),
+    db: Session = Depends(get_db),
+    current_user: schemas.User = Depends(get_current_user)
+):
+    simulados_query = db.query(models.Simulado).filter(models.Simulado.user_id == current_user.id)
+
+    if dias:
+        limite_data = datetime.utcnow() - timedelta(days=dias)
+        simulados_query = simulados_query.filter(models.Simulado.data_realizacao >= limite_data)
+
+    simulados = simulados_query.all()
+
     if not simulados:
-        return schemas.SimuladoStatisticsResponse(
+        return schemas.SimuladoStatisticsResponse( 
             total_simulados=0,
             percentual_geral=0.0,
-            por_tipo={},
+            por_tipo={
+                "basico": {"acertos": 0, "total": 0, "percentual": 0.0},
+                "especifico": {"acertos": 0, "total": 0, "percentual": 0.0}
+            },
             por_materia={},
             historico=[]
         )
 
-    total_acertos_geral = 0
-    total_questoes_geral = 0
-    por_tipo = {"basico": {"acertos": 0, "erros": 0}, "especifico": {"acertos": 0, "erros": 0}}
-    por_materia = {}
+    total_acertos_geral = sum(s.acertos_total for s in simulados)
+    total_questoes_geral = sum(s.total_questoes for s in simulados)
+    percentual_geral = (total_acertos_geral / total_questoes_geral) * 100 if total_questoes_geral else 0
+
+    agg_acertos_por_tipo = {"basico": 0, "especifico": 0}
+    agg_erros_por_tipo = {"basico": 0, "especifico": 0}
+    agg_acertos_por_materia = {}
+    agg_erros_por_materia = {}
 
     for s in simulados:
-        if s.status == "finalizado":
-            total_acertos_geral += s.acertos_total
-            total_questoes_geral += s.total_questoes
-            
-            por_tipo["basico"]["acertos"] += s.acertos_basicos
-            por_tipo["basico"]["erros"] += s.erros_basicos
-            por_tipo["especifico"]["acertos"] += s.acertos_especificos
-            por_tipo["especifico"]["erros"] += s.erros_especificos
-            
-            # Recalcular estatísticas por matéria
-            if s.questoes_ids and isinstance(s.questoes_ids, str):
-                questoes_ids = json.loads(s.questoes_ids)
-                questoes = db.query(models.Question).filter(models.Question.id.in_(questoes_ids)).all()
-                respostas = crud.get_respostas_simulado(db, s.id) # Assumindo que essa função existe
-                
-                for q in questoes:
-                    if q.materia not in por_materia:
-                        por_materia[q.materia] = {"acertos": 0, "erros": 0, "total": 0}
-                    
-                    por_materia[q.materia]["total"] += 1
-                    
-                    if respostas.get(str(q.id)) is not None:
-                        gabarito = crud.mapear_gabarito_para_indice(q.gabarito)
-                        if respostas.get(str(q.id)) == gabarito:
-                            por_materia[q.materia]["acertos"] += 1
-                        else:
-                            por_materia[q.materia]["erros"] += 1
+        agg_acertos_por_tipo["basico"] += s.acertos_basicos
+        agg_erros_por_tipo["basico"] += s.erros_basicos
+        agg_acertos_por_tipo["especifico"] += s.acertos_especificos
+        agg_erros_por_tipo["especifico"] += s.erros_especificos
 
-    percentual_geral = (total_acertos_geral / total_questoes_geral) * 100 if total_questoes_geral > 0 else 0.0
+        # Corrigir campos JSON serializados como string
+        try:
+            acertos_por_materia = json.loads(s.acertos_por_materia) if isinstance(s.acertos_por_materia, str) else s.acertos_por_materia
+        except:
+            acertos_por_materia = {}
 
-    # Adicionar percentual por tipo e matéria
-    for tipo, stats in por_tipo.items():
-        total_questoes_tipo = stats["acertos"] + stats["erros"]
-        stats["percentual"] = (stats["acertos"] / total_questoes_tipo) * 100 if total_questoes_tipo > 0 else 0.0
-    
-    for materia, stats in por_materia.items():
-        total_questoes_materia = stats["acertos"] + stats["erros"]
-        stats["percentual"] = (stats["acertos"] / total_questoes_materia) * 100 if total_questoes_materia > 0 else 0.0
+        try:
+            erros_por_materia = json.loads(s.erros_por_materia) if isinstance(s.erros_por_materia, str) else s.erros_por_materia
+        except:
+            erros_por_materia = {}
+
+        for mat, acertos in acertos_por_materia.items():
+            agg_acertos_por_materia[mat] = agg_acertos_por_materia.get(mat, 0) + acertos
+        for mat, erros in erros_por_materia.items():
+            agg_erros_por_materia[mat] = agg_erros_por_materia.get(mat, 0) + erros
+
+    por_tipo = {}
+    for tipo in ["basico", "especifico"]:
+        total_tipo = agg_acertos_por_tipo[tipo] + agg_erros_por_tipo[tipo]
+        percentual = (agg_acertos_por_tipo[tipo] / total_tipo) * 100 if total_tipo else 0
+        por_tipo[tipo] = schemas.SimuladoTipoStats( 
+            acertos=agg_acertos_por_tipo[tipo],
+            total=total_tipo,
+            percentual=round(percentual, 2)
+        )
+
+    por_materia = {}
+    for mat in set(list(agg_acertos_por_materia.keys()) + list(agg_erros_por_materia.keys())):
+        total_materia = agg_acertos_por_materia.get(mat, 0) + agg_erros_por_materia.get(mat, 0)
+        percentual = (agg_acertos_por_materia.get(mat, 0) / total_materia) * 100 if total_materia else 0
+        por_materia[mat] = schemas.SimuladoMateriaStats( 
+            acertos=agg_acertos_por_materia.get(mat, 0),
+            total=total_materia,
+            percentual=round(percentual, 2)
+        )
 
     historico = sorted([schemas.SimuladoHistoricoItem( 
         id=s.id,
@@ -240,37 +269,30 @@ def get_user_simulado_statistics(
 
 @router.get("/api/simulados/count-questions/")
 def contar_questoes_filtradas(
-    materia: Optional[str] = None,
-    assuntos: Optional[List[str]] = Query(None),
-    banca: Optional[List[str]] = Query(None),
-    orgao: Optional[List[str]] = Query(None),
-    cargo: Optional[List[str]] = Query(None),
-    ano: Optional[List[int]] = Query(None),
-    escolaridade: Optional[List[str]] = Query(None),
-    dificuldade: Optional[List[str]] = Query(None),
-    regiao: Optional[List[str]] = Query(None),
-    db: Session = Depends(get_db)
+  materia: Optional[str] = None,
+  assuntos: Optional[List[str]] = Query(None),
+  banca: Optional[List[str]] = Query(None),
+  orgao: Optional[List[str]] = Query(None),
+  cargo: Optional[List[str]] = Query(None),
+  ano: Optional[List[int]] = Query(None),
+  escolaridade: Optional[List[str]] = Query(None),
+  dificuldade: Optional[List[str]] = Query(None),
+  regiao: Optional[List[str]] = Query(None),
+  db: Session = Depends(get_db),
 ):
-    filtros = {
-        "materia": materia,
-        "assuntos": assuntos,
-        "banca": banca,
-        "orgao": orgao,
-        "cargo": cargo,
-        "ano": ano,
-        "escolaridade": escolaridade,
-        "dificuldade": dificuldade,
-        "regiao": regiao,
-    }
-    
-    # Chama a função count_questions do crud
-    resultado = crud.count_questions(db=db, **filtros)
-    
-    return {"total_questoes": resultado["count"]}
-
-
-
-
+  total = crud.count_questions(
+    db=db,
+    materia=materia,
+    assuntos=assuntos,
+    banca=banca,
+    orgao=orgao,
+    cargo=cargo,
+    ano=ano,
+    escolaridade=escolaridade,
+    dificuldade=dificuldade,
+    regiao=regiao
+  )
+  return {"total": total}
 
 
 

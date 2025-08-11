@@ -2,8 +2,8 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status, APIRouter, Body
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 import logging
 
@@ -12,13 +12,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Importações relativas
-from backend import models, schemas, crud
-from backend.database import get_db
-
-# Criação do roteador
-router = APIRouter(
-    tags=["auth"]
-)
+from . import models, schemas, crud
+from .database import get_db
 
 # Tente importar bcrypt diretamente para verificar a versão
 try:
@@ -33,18 +28,45 @@ SECRET_KEY = "sua_chave_secreta_muito_segura_e_longa"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/token")
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     Verifica se uma senha em texto puro corresponde a uma senha hasheada.
     """
-    logger.info(f"Verificando senha: plain_password (parcial)={plain_password[:3]}..., hashed_password (parcial)={hashed_password[:3]}...")
-    return pwd_context.verify(plain_password, hashed_password)
+    logger.info(f"Verificando senha: plain_password (parcial)={plain_password[:3]}..., hashed_password (parcial)={hashed_password[:10]}...")
+    result = pwd_context.verify(plain_password, hashed_password)
+    logger.info(f"Resultado da verificação: {result}")
+    return result
 
 def get_password_hash(password: str) -> str:
     """
-    Cria o hash de uma senha em texto puro.
+    Gera o hash de uma senha em texto puro.
     """
-    return pwd_context.hash(password)
+    hashed = pwd_context.hash(password)
+    logger.info(f"Senha hasheada (parcial): {hashed[:10]}...")
+    return hashed
+
+# FUNÇÃO AUTHENTICATE_USER AGORA BUSCA POR EMAIL
+def authenticate_user(db: Session, username: str, password: str):
+    """
+    Autentica um usuário verificando o email (passado como 'username' no formulário) e a senha.
+    """
+    logger.info(f"Tentando autenticar usuário com email: {username}")
+    # AQUI ESTÁ A MUDANÇA: Usamos get_user_by_email para buscar pelo email
+    user = crud.get_user_by_email(db, email=username)
+    
+    if not user:
+        logger.warning(f"Usuário com email '{username}' não encontrado.")
+        return None
+    
+    logger.info(f"Usuário '{username}' encontrado. Verificando senha...")
+    if not verify_password(password, user.hashed_password):
+        logger.warning(f"Senha incorreta para o usuário '{username}'.")
+        return None
+    
+    logger.info(f"Usuário '{username}' autenticado com sucesso.")
+    return user
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """
@@ -54,26 +76,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    logger.info(f"Token de acesso criado para sub: {data.get('sub')}")
     return encoded_jwt
 
-oauth2_scheme = router.OAuth2PasswordBearer(tokenUrl="api/auth/token")
-
-def authenticate_user(db: Session, username: str, password: str) -> Optional[models.User]:
-    """
-    Autentica um usuário com base no nome de usuário e senha.
-    """
-    user = crud.get_user_by_username(db, username=username)
-    if not user:
-        return None
-    if not verify_password(password, user.hashed_password):
-        return None
-    logger.info(f"Usuário '{username}' autenticado com sucesso.")
-    return user
-
-async def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)) -> schemas.User:
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     """
     Obtém o usuário atual a partir do token JWT.
     """
@@ -110,36 +119,8 @@ async def get_current_admin_user(current_user: schemas.User = Depends(get_curren
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Operação não permitida para usuários não administradores",
         )
+    logger.info(f"Usuário admin '{current_user.username}' autenticado para acesso admin.")
     return current_user
-
-# --- Rotas de Autenticação ---
-
-@router.post("/token", response_model=schemas.Token)
-def login_for_access_token(db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username, "id": user.id}, expires_delta=access_token_expires
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
-
-@router.post("/register/", response_model=schemas.User)
-def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    db_user = crud.get_user_by_email(db, email=user.email) or crud.get_user_by_username(db, username=user.username)
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email ou nome de usuário já registrado")
-    return crud.create_user(db=db, user=user)
-
-@router.get("/users/me/", response_model=schemas.User)
-def read_users_me(current_user: schemas.User = Depends(get_current_user)):
-    return current_user
-
 
 
 

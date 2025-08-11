@@ -2,9 +2,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-from backend import models, schemas, crud
-from backend.database import get_db
-from backend.auth import get_current_user
+from .. import models, schemas
+from ..database import get_db
+from ..auth import get_current_user
 import json # Importa o módulo json
 
 # Criação do roteador
@@ -32,14 +32,18 @@ def gerar_caderno_do_edital(
     conteudo = edital.conteudo or {}
     materias_do_edital = list(conteudo.keys())
     
+    # 3. Processar os assuntos para criar termos de busca mais granulares.
     termos_de_busca_assuntos = []
-    for materia in materias_do_edital:
-        for bloco in conteudo[materia]:
-            if isinstance(bloco, dict) and 'titulo' in bloco:
-                # Usa split para pegar as palavras-chave do título
-                termos_de_busca_assuntos.extend(bloco['titulo'].lower().split())
-    
-    # 3. Adicionar lógica de filtros
+    assuntos_do_edital_bruto = [assunto for sublist in conteudo.values() for assunto in sublist]
+
+    for assunto_str in assuntos_do_edital_bruto:
+        partes = [p.strip() for p in assunto_str.replace(',', ';').split(';') if p.strip()]
+        for parte in partes:
+            palavras = parte.split()
+            palavras_filtradas = [p for p in palavras if len(p) > 2 and p.lower() not in ['de', 'da', 'do', 'e', 'em', 'para', 'com']]
+            termos_de_busca_assuntos.extend(palavras_filtradas)
+
+    # 4. Criar os filtros para a busca no banco de dados.
     filtros = []
     
     for materia in materias_do_edital:
@@ -67,19 +71,15 @@ def gerar_caderno_do_edital(
     questoes_ids_json = json.dumps(questoes_ids)
 
     novo_caderno = models.Notebook(
-        nome=f"Caderno - {edital.nome}", # Usar o nome do edital como base
+        nome=f"Caderno - {edital.nome}", 
         user_id=current_user.id,
-        questoes_ids=questoes_ids_json,
-        disciplina=edital.disciplina,
-        total_questoes=len(questoes_unicas)
+        questoes_ids=questoes_ids_json # Use a string JSON serializada
     )
-
     db.add(novo_caderno)
     db.commit()
     db.refresh(novo_caderno)
 
-    return {"message": "Caderno de questões criado com sucesso!", "caderno_id": novo_caderno.id}
-
+    return {"message": "Caderno gerado com sucesso!", "notebook_id": novo_caderno.id}
 
 
 
