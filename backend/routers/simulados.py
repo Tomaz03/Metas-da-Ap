@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from ..schemas import SimuladoConfigSchema, QuestaoFeedback
-from .. import crud, schemas, models 
-from ..auth import get_current_user 
-from ..database import get_db 
+from schemas import SimuladoConfigSchema, QuestaoFeedback
+from import crud, schemas, models 
+from auth import get_current_user 
+from database import get_db 
 from datetime import datetime, timedelta
 import random
 import json
