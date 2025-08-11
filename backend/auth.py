@@ -11,9 +11,9 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Importações relativas
-from . import models, schemas, crud
-from .database import get_db
+# Importações corrigidas
+from backend import models, schemas, crud 
+from backend.database import get_db
 
 # Tente importar bcrypt diretamente para verificar a versão
 try:
@@ -34,39 +34,14 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     Verifica se uma senha em texto puro corresponde a uma senha hasheada.
     """
-    logger.info(f"Verificando senha: plain_password (parcial)={plain_password[:3]}..., hashed_password (parcial)={hashed_password[:10]}...")
-    result = pwd_context.verify(plain_password, hashed_password)
-    logger.info(f"Resultado da verificação: {result}")
-    return result
+    logger.info(f"Verificando senha: plain_password (parcial)={plain_password[:3]}..., hashed_password (parcial)={hashed_password[:3]}...")
+    return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
     """
-    Gera o hash de uma senha em texto puro.
+    Retorna o hash de uma senha.
     """
-    hashed = pwd_context.hash(password)
-    logger.info(f"Senha hasheada (parcial): {hashed[:10]}...")
-    return hashed
-
-# FUNÇÃO AUTHENTICATE_USER AGORA BUSCA POR EMAIL
-def authenticate_user(db: Session, username: str, password: str):
-    """
-    Autentica um usuário verificando o email (passado como 'username' no formulário) e a senha.
-    """
-    logger.info(f"Tentando autenticar usuário com email: {username}")
-    # AQUI ESTÁ A MUDANÇA: Usamos get_user_by_email para buscar pelo email
-    user = crud.get_user_by_email(db, email=username)
-    
-    if not user:
-        logger.warning(f"Usuário com email '{username}' não encontrado.")
-        return None
-    
-    logger.info(f"Usuário '{username}' encontrado. Verificando senha...")
-    if not verify_password(password, user.hashed_password):
-        logger.warning(f"Senha incorreta para o usuário '{username}'.")
-        return None
-    
-    logger.info(f"Usuário '{username}' autenticado com sucesso.")
-    return user
+    return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """
@@ -76,21 +51,22 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    logger.info(f"Token de acesso criado para sub: {data.get('sub')}")
+    logger.info(f"Token JWT criado com sucesso. Expira em: {expire}")
     return encoded_jwt
+
+credentials_exception = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="Não foi possível validar as credenciais",
+    headers={"WWW-Authenticate": "Bearer"},
+)
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     """
     Obtém o usuário atual a partir do token JWT.
     """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Não foi possível validar as credenciais",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
@@ -119,8 +95,9 @@ async def get_current_admin_user(current_user: schemas.User = Depends(get_curren
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Operação não permitida para usuários não administradores",
         )
-    logger.info(f"Usuário admin '{current_user.username}' autenticado para acesso admin.")
+    logger.info(f"Acesso de administrador concedido para o usuário: {current_user.username}")
     return current_user
+
 
 
 
