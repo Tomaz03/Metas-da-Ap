@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-from backend import crud, schemas, auth # Importação corrigida
+from backend import crud, schemas, auth
 from backend.database import get_db
 
 router = APIRouter(
@@ -35,7 +35,6 @@ def obter_plano_de_estudo(
     # 4. Retorna o objeto completo
     return calendar
 
-# 3. A rota POST já está correta em relação ao novo modelo.
 @router.post("/{edital_id}", response_model=schemas.StudyCalendar)
 def criar_ou_atualizar_calendario(
     edital_id: int,
@@ -61,10 +60,8 @@ def criar_ou_atualizar_calendario(
         data_fim=calendar_data.data_fim
     )
 
-    # 3. Adiciona manualmente os atributos que faltam ao objeto antes de retorná-lo.
-    #    Isso garante que o objeto corresponda ao schema `schemas.StudyCalendar`.
+    # 3. Adiciona os atributos para corresponder ao schema de retorno
     setattr(saved_calendar, 'titulo_edital', edital.nome)
     setattr(saved_calendar, 'edital', edital)
-
-    # 4. Retorna o objeto completo. Agora ele é compatível com o response_model.
+    
     return saved_calendar

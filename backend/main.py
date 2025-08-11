@@ -17,14 +17,13 @@ import json
 import sys
 import os
 
-# Adds the 'backend' directory to sys.path
+# Adiciona o diretório raiz do projeto ao sys.path para importações absolutas
 current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
-import pdf_processor # Import the pdf_processor module
-
-# Relative imports
+# Importações absolutas
 from backend import crud, models, schemas, auth, pdf_processor
 from backend.database import SessionLocal, engine, get_db
 
@@ -41,23 +40,54 @@ app = FastAPI()
 origins = [
     "http://localhost:5173",  # Where your React frontend is running
     "http://127.0.0.1:5173",
-    # Add other domains if the frontend is hosted elsewhere
+    "https://study-planners.vercel.app" # URL do seu front-end em produção
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Temporarily allow all origins for debugging
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"], # Allow all methods (GET, POST, PUT, DELETE, etc.)
-    allow_headers=["*"], # Allow all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+# Incluir os roteadores da API
+app.include_router(auth.router, prefix="/api/auth")
 app.include_router(simulados.router)
 app.include_router(edital_verticalizado.router)
 app.include_router(calendario.router, prefix="/api/calendario")
 
 # --- Authentication Endpoints ---
+
+@app.post("/api/upload-edital/")
+async def upload_edital(
+    file: UploadFile = File(...),
+    nome: str = Form(...),
+    disciplina: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: schemas.User = Depends(auth.get_current_user)
+):
+    try:
+        conteudo_edital = await pdf_processor.processar_pdf(file.file)
+        
+        edital_schema = schemas.VerticalizedSyllabusCreate(
+            nome=nome,
+            disciplina=disciplina,
+            conteudo=conteudo_edital,
+            marcacoes={}
+        )
+        
+        db_edital = crud.create_verticalized_syllabus(
+            db=db,
+            syllabus=edital_schema,
+            user_id=current_user.id
+        )
+
+        return jsonable_encoder({"message": "Edital processado e salvo com sucesso!", "edital": db_edital})
+
+    except Exception as e:
+        logger.error(f"Erro ao processar edital: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro interno do servidor ao processar o edital: {str(e)}")
 
 @app.post("/api/token", response_model=schemas.Token)
 async def login_for_access_token(
@@ -985,12 +1015,27 @@ def create_syllabus(
 ):
     return crud.create_verticalized_syllabus(db=db, syllabus=syllabus, user_id=current_user.id)
 
-@app.get("/api/edital-verticalizado/", response_model=List[schemas.VerticalizedSyllabus])
+@app.get("/api/editais/", response_model=List[schemas.VerticalizedSyllabus])
 def list_user_syllabi(
-    current_user: schemas.User = Depends(auth.get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: schemas.User = Depends(auth.get_current_user)
 ):
-    return crud.get_user_syllabi(db, current_user.id)
+    syllabi = crud.get_user_syllabi(db, current_user.id)
+    if not syllabi:
+        return []
+    
+    # Adicionar o campo 'plano_de_estudo' para cada edital
+    syllabi_com_plano = []
+    for s in syllabi:
+        plano = crud.get_study_calendar(db, user_id=current_user.id, edital_id=s.id)
+        if plano:
+            s.plano_de_estudo = True
+        else:
+            s.plano_de_estudo = False
+        syllabi_com_plano.append(s)
+
+    return syllabi_com_plano
+
 
 @app.get("/api/edital-verticalizado/{syllabus_id}", response_model=schemas.VerticalizedSyllabus)
 def get_syllabus(
@@ -1052,18 +1097,14 @@ def get_materias_edital(
     return materias
 
 # Endpoint para buscar todos os editais de um usuário que possuem calendário
-@app.get("/api/planos-de-estudo/usuario", response_model=List[schemas.VerticalizedSyllabus])
-def get_user_syllabi_with_calendars(
+@app.get("/api/editais/with-calendar/", response_model=List[schemas.VerticalizedSyllabus])
+def get_syllabi_with_calendars_route(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    """
-    Busca todos os editais de um usuário que possuem um calendário de estudo associado.
-    """
-    syllabi = crud.get_syllabi_with_calendars(db, current_user.id)
-    if not syllabi:
-        return []
-    return syllabi
+    syllabi_with_calendars = crud.get_syllabi_with_calendars(db, user_id=current_user.id)
+    return syllabi_with_calendars
+
 
 
 # Endpoint para gerar o plano de estudos de um edital específico
@@ -1113,7 +1154,7 @@ def get_sugestoes_de_estudo_com_pesos(
 
 
 # Endpoint único para listar todos os planos de estudo do usuário com título do edital
-@app.get("/api/plano-de-estudo", response_model=List[schemas.StudyCalendar])
+@app.get("/api/user-study-plans/", response_model=List[schemas.StudyCalendar])
 def list_user_study_plans(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
@@ -1133,18 +1174,19 @@ def list_user_study_plans(
             continue
 
         # Monta o dicionário de resposta no formato exato do schema StudyCalendar
-        plano_formatado = {
-            "id": plano_info.id,
-            "user_id": current_user.id,  # Adiciona o user_id que estava faltando
-            "edital_id": plano_info.edital_id,
-            "titulo_edital": plano_info.titulo_edital,
-            "data": plano_info.data,
-            "data_inicio": plano_info.data_inicio,
-            "data_fim": plano_info.data_fim,
-            "criado_em": plano_info.criado_em,
-            "updated_at": plano_info.updated_at,
-            "edital": edital_obj  # Adiciona o objeto edital completo que estava faltando
-        }
+        plano_formatado = schemas.StudyCalendar(
+            id=plano_info.id,
+            user_id=current_user.id,  # Adiciona o user_id que estava faltando
+            edital_id=plano_info.edital_id,
+            titulo_edital=plano_info.titulo_edital,
+            data=plano_info.data,
+            data_inicio=plano_info.data_inicio,
+            data_fim=plano_info.data_fim,
+            criado_em=plano_info.criado_em,
+            updated_at=plano_info.updated_at,
+            edital=edital_obj, # Adiciona o objeto edital completo
+        )
+        
         resultados_finais.append(plano_formatado)
-
+        
     return resultados_finais

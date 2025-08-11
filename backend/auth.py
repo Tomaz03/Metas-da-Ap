@@ -2,8 +2,8 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, status, APIRouter, Body
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 import logging
 
@@ -11,9 +11,14 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Importações corrigidas
-from backend import models, schemas, crud 
+# Importações relativas
+from backend import models, schemas, crud
 from backend.database import get_db
+
+# Criação do roteador
+router = APIRouter(
+    tags=["auth"]
+)
 
 # Tente importar bcrypt diretamente para verificar a versão
 try:
@@ -28,8 +33,6 @@ SECRET_KEY = "sua_chave_secreta_muito_segura_e_longa"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/token")
-
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     Verifica se uma senha em texto puro corresponde a uma senha hasheada.
@@ -39,7 +42,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     """
-    Retorna o hash de uma senha.
+    Cria o hash de uma senha em texto puro.
     """
     return pwd_context.hash(password)
 
@@ -54,19 +57,31 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    logger.info(f"Token JWT criado com sucesso. Expira em: {expire}")
     return encoded_jwt
 
-credentials_exception = HTTPException(
-    status_code=status.HTTP_401_UNAUTHORIZED,
-    detail="Não foi possível validar as credenciais",
-    headers={"WWW-Authenticate": "Bearer"},
-)
+oauth2_scheme = router.OAuth2PasswordBearer(tokenUrl="api/auth/token")
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+def authenticate_user(db: Session, username: str, password: str) -> Optional[models.User]:
+    """
+    Autentica um usuário com base no nome de usuário e senha.
+    """
+    user = crud.get_user_by_username(db, username=username)
+    if not user:
+        return None
+    if not verify_password(password, user.hashed_password):
+        return None
+    logger.info(f"Usuário '{username}' autenticado com sucesso.")
+    return user
+
+async def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)) -> schemas.User:
     """
     Obtém o usuário atual a partir do token JWT.
     """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Não foi possível validar as credenciais",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
@@ -95,7 +110,34 @@ async def get_current_admin_user(current_user: schemas.User = Depends(get_curren
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Operação não permitida para usuários não administradores",
         )
-    logger.info(f"Acesso de administrador concedido para o usuário: {current_user.username}")
+    return current_user
+
+# --- Rotas de Autenticação ---
+
+@router.post("/token", response_model=schemas.Token)
+def login_for_access_token(db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username, "id": user.id}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@router.post("/register/", response_model=schemas.User)
+def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    db_user = crud.get_user_by_email(db, email=user.email) or crud.get_user_by_username(db, username=user.username)
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email ou nome de usuário já registrado")
+    return crud.create_user(db=db, user=user)
+
+@router.get("/users/me/", response_model=schemas.User)
+def read_users_me(current_user: schemas.User = Depends(get_current_user)):
     return current_user
 
 

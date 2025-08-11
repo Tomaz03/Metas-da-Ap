@@ -4,7 +4,7 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 import random
 import json
-from backend import crud, models, schemas # Importação corrigida
+from backend import crud, models, schemas
 from backend.auth import get_current_user
 from backend.database import get_db
 
@@ -17,9 +17,7 @@ def gerar_simulado(payload: schemas.SimuladoConfigSchema, db: Session = Depends(
 
     for config in payload.materias_config:
         # Montar filtros adicionais
-
         filtros_adicionais = config.additional_filters or {}
-
         questoes = crud.get_questions(
             db=db,
             materia=config.materia,
@@ -59,7 +57,7 @@ def gerar_simulado(payload: schemas.SimuladoConfigSchema, db: Session = Depends(
         user_id=current_user.id,
         tempo_limite=payload.tempo_limite_minutos * 60,
         total_questoes=len(todas_questoes),
-        questoes_ids=questoes_ids_selecionadas,
+        questoes_ids=json.dumps(questoes_ids_selecionadas), # Correctly convert to JSON string
         acertos_total=0,
         erros_total=0,
         percentual_acerto=0.0,
@@ -194,8 +192,9 @@ def get_user_simulado_statistics(
             por_tipo["especifico"]["erros"] += s.erros_especificos
             
             # Recalcular estatísticas por matéria
-            if s.questoes_ids and isinstance(s.questoes_ids, list):
-                questoes = db.query(models.Question).filter(models.Question.id.in_(s.questoes_ids)).all()
+            if s.questoes_ids and isinstance(s.questoes_ids, str):
+                questoes_ids = json.loads(s.questoes_ids)
+                questoes = db.query(models.Question).filter(models.Question.id.in_(questoes_ids)).all()
                 respostas = crud.get_respostas_simulado(db, s.id) # Assumindo que essa função existe
                 
                 for q in questoes:
@@ -268,6 +267,7 @@ def contar_questoes_filtradas(
     resultado = crud.count_questions(db=db, **filtros)
     
     return {"total_questoes": resultado["count"]}
+
 
 
 
