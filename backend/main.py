@@ -25,8 +25,8 @@ if current_dir not in sys.path:
 import pdf_processor # Import the pdf_processor module
 
 # Relative imports
-from . import crud, models, schemas, auth
-from .database import SessionLocal, engine, get_db
+from backend import crud, models, schemas, auth, pdf_processor
+from backend.database import SessionLocal, engine, get_db
 
 # Configure the logger to display INFO or DEBUG messages
 logging.basicConfig(level=logging.INFO)
