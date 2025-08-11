@@ -2,10 +2,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-from .. import models, schemas
-from ..database import get_db
-from ..auth import get_current_user
+from backend import models, schemas # Importação corrigida
+from backend.database import get_db
+from backend.auth import get_current_user
 import json # Importa o módulo json
+from backend import crud # Importa o módulo crud
 
 # Criação do roteador
 router = APIRouter(

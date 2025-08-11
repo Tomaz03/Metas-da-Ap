@@ -8,10 +8,9 @@ from typing import List, Dict, Any
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Query
 from urllib.parse import unquote
-# CORREÇÃO AQUI: Usando o nome correto da pasta 'routers'
-from routers import simulados
-from routers import edital_verticalizado
-from routers import calendario
+from backend.routers import simulados
+from backend.routers import edital_verticalizado
+from backend.routers import calendario
 from fastapi.encoders import jsonable_encoder
 import logging
 import json
@@ -53,6 +52,7 @@ app.add_middleware(
     allow_headers=["*"], # Allow all headers
 )
 
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(simulados.router)
 app.include_router(edital_verticalizado.router)
 app.include_router(calendario.router, prefix="/api/calendario")
