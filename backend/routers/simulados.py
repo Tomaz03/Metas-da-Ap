@@ -1,18 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from backend.schemas import SimuladoConfigSchema, QuestaoFeedback # Correção aqui
-import backend.crud as crud, backend.models as models # Correção aqui
-from backend.auth import get_current_user # Correção aqui
-from backend.database import get_db 
 from datetime import datetime, timedelta
 import random
 import json
+from backend import crud, models, schemas # Importação corrigida
+from backend.auth import get_current_user
+from backend.database import get_db
 
 router = APIRouter()
 
 @router.post("/api/simulados/generate/")
-def gerar_simulado(payload: SimuladoConfigSchema, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
+def gerar_simulado(payload: schemas.SimuladoConfigSchema, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
     todas_questoes = []
     questoes_ids_selecionadas = []
 
@@ -87,7 +86,7 @@ def gerar_simulado(payload: SimuladoConfigSchema, db: Session = Depends(get_db),
 @router.post("/api/simulados/submit/{simulado_id}")
 def submeter_simulado(
     simulado_id: int,
-    respostas: List[QuestaoFeedback],
+    respostas: List[schemas.QuestaoFeedback],
     db: Session = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user)
 ):
@@ -269,6 +268,7 @@ def contar_questoes_filtradas(
     resultado = crud.count_questions(db=db, **filtros)
     
     return {"total_questoes": resultado["count"]}
+
 
 
 
