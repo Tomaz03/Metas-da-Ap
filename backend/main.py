@@ -9,9 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Query
 from urllib.parse import unquote
 # CORREÇÃO AQUI: Usando o nome correto da pasta 'routers'
-from .routers import simulados
-from .routers import edital_verticalizado
-from .routers import calendario
+from backend.routers import simulados
+from backend.routers import edital_verticalizado
+from backend.routers import calendario
 from fastapi.encoders import jsonable_encoder
 import logging
 import json
@@ -26,8 +26,8 @@ if current_dir not in sys.path:
 import pdf_processor # Import the pdf_processor module
 
 # Relative imports
-from . import crud, models, schemas, auth
-from .database import SessionLocal, engine, get_db
+from backend import crud, models, schemas, auth
+from backend.database import SessionLocal, engine, get_db
 
 # Configure the logger to display INFO or DEBUG messages
 logging.basicConfig(level=logging.INFO)
