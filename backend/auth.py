@@ -12,8 +12,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Importações relativas
-from . import models, schemas, crud
-from .database import get_db
+from backend import models, schemas, crud
+from backend.database import get_db
 
 # Tente importar bcrypt diretamente para verificar a versão
 try:
