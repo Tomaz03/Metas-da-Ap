@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from schemas import SimuladoConfigSchema, QuestaoFeedback
-from import crud, schemas, models 
+import crud, models
 from auth import get_current_user 
 from database import get_db 
 from datetime import datetime, timedelta
@@ -269,30 +269,30 @@ def obter_estatisticas_simulados(
 
 @router.get("/api/simulados/count-questions/")
 def contar_questoes_filtradas(
-  materia: Optional[str] = None,
-  assuntos: Optional[List[str]] = Query(None),
-  banca: Optional[List[str]] = Query(None),
-  orgao: Optional[List[str]] = Query(None),
-  cargo: Optional[List[str]] = Query(None),
-  ano: Optional[List[int]] = Query(None),
-  escolaridade: Optional[List[str]] = Query(None),
-  dificuldade: Optional[List[str]] = Query(None),
-  regiao: Optional[List[str]] = Query(None),
-  db: Session = Depends(get_db),
+    materia: Optional[str] = None,
+    assuntos: Optional[List[str]] = Query(None),
+    banca: Optional[List[str]] = Query(None),
+    orgao: Optional[List[str]] = Query(None),
+    cargo: Optional[List[str]] = Query(None),
+    ano: Optional[List[int]] = Query(None),
+    escolaridade: Optional[List[str]] = Query(None),
+    dificuldade: Optional[List[str]] = Query(None),
+    regiao: Optional[List[str]] = Query(None),
+    db: Session = Depends(get_db),
 ):
-  total = crud.count_questions(
-    db=db,
-    materia=materia,
-    assuntos=assuntos,
-    banca=banca,
-    orgao=orgao,
-    cargo=cargo,
-    ano=ano,
-    escolaridade=escolaridade,
-    dificuldade=dificuldade,
-    regiao=regiao
-  )
-  return {"total": total}
+    total = crud.count_questions(
+        db=db,
+        materia=materia,
+        assuntos=assuntos,
+        banca=banca,
+        orgao=orgao,
+        cargo=cargo,
+        ano=ano,
+        escolaridade=escolaridade,
+        dificuldade=dificuldade,
+        regiao=regiao
+    )
+    return {"total": total}
 
 
 
