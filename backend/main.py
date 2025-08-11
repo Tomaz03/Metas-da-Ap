@@ -9,9 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Query
 from urllib.parse import unquote
 # CORREÇÃO AQUI: Usando o nome correto da pasta 'routers'
-from .routers import simulados
-from .routers import edital_verticalizado
-from .routers import calendario
+from routers import simulados
+from routers import edital_verticalizado
+from routers import calendario
 from fastapi.encoders import jsonable_encoder
 import logging
 import json
