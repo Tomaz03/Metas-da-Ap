@@ -292,12 +292,11 @@ export default function MinhasAnotacoesPainel({ token, onUnauthorized, API_URL }
                                     </p>
                                 </div>
                                 <button
-                                    onClick={() => handleViewNoteDetails(note.id)}
-                                    className="ml-4 p-2 text-blue-600 hover:text-blue-800 transition"
-                                    title="Ver Detalhes"
-                                >
-                                    <FileText className="w-5 h-5" />
-                                </button>
+    onClick={() => handleViewNoteDetails(note.id)}
+    className="ml-4 px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm hover:bg-blue-200 transition"
+>
+    Ver Anotação
+</button>
                             </div>
                         );
                     })}
