@@ -40,9 +40,9 @@ app = FastAPI()
 
 # CORS configuration
 origins = [
-    "http://localhost:5173",  # Where your React frontend is running
+    "http://localhost:5173",  # Onde seu frontend React está rodando localmente
     "http://127.0.0.1:5173",
-    # Add other domains if the frontend is hosted elsewhere
+    "https://metas-da-ap-k465.vercel.app"  # O endereço do seu frontend no Vercel
 ]
 
 app.add_middleware(
