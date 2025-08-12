@@ -1,5 +1,7 @@
+import { useNavigate } from "react-router-dom";
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import TopNav from "../TopNav";
 
 const SubjectSection = ({ title, subjects, sectionType, onAdd, onRemove, onChange }) => (
   <div className="space-y-4">
@@ -49,14 +51,15 @@ const SubjectSection = ({ title, subjects, sectionType, onAdd, onRemove, onChang
   </div>
 );
 
-const EditalVerticalizado = ({ token: tokenProp }) => {
-  // hooks no topo (importante)
+const EditalVerticalizado = ({ token: tokenProp, onLogout }) => {
+  const navigate = useNavigate();
   const [tituloEdital, setTituloEdital] = useState('');
   const [basicSubjects, setBasicSubjects] = useState([{ id: crypto.randomUUID(), name: '', content: '' }]);
   const [specificSubjects, setSpecificSubjects] = useState([{ id: crypto.randomUUID(), name: '', content: '' }]);
   const [verticalizedNotice, setVerticalizedNotice] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  
 
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
@@ -343,70 +346,65 @@ const EditalVerticalizado = ({ token: tokenProp }) => {
     const tokenLocal = token || localStorage.getItem('token');
 
     if (!tituloEdital.trim()) {
-      alert("Dê um nome ao edital antes de salvar.");
-      return;
+        alert("Dê um nome ao edital antes de salvar.");
+        return;
     }
 
     if (verticalizedNotice.length === 0) {
-      alert("Gere o edital antes de salvar.");
-      return;
+        alert("Gere o edital antes de salvar.");
+        return;
     }
 
     const conteudo = {};
     const marcacoes = {};
 
     verticalizedNotice.forEach(item => {
-      const { section, topic, completed, leiSeca, juris, questoes, revisoes, revisaoNumero } = item;
-      if (!conteudo[section]) {
-        conteudo[section] = [];
-        marcacoes[section] = {};
-      }
-      conteudo[section].push(topic);
-      marcacoes[section][topic] = {
-        completado: completed,
-        leiSeca,
-        juris,
-        questoes,
-        revisoes,
-        revisaoNumero
-      };
+        const { section, topic, completed, leiSeca, juris, questoes, revisoes, revisaoNumero } = item;
+        if (!conteudo[section]) {
+            conteudo[section] = [];
+            marcacoes[section] = {};
+        }
+        conteudo[section].push(topic);
+        marcacoes[section][topic] = {
+            completado: completed,
+            leiSeca,
+            juris,
+            questoes,
+            revisoes,
+            revisaoNumero
+        };
     });
 
     const payload = {
-      nome: tituloEdital.trim(),
-      disciplina: "Multidisciplinar",
-      conteudo,
-      marcacoes
+        nome: tituloEdital.trim(),
+        disciplina: "Multidisciplinar",
+        conteudo,
+        marcacoes
     };
 
     const url = isEditing ? `http://localhost:8000/api/edital-verticalizado/${editalId}` : "http://localhost:8000/api/edital-verticalizado/";
     const method = isEditing ? "PATCH" : "POST";
 
     try {
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${tokenLocal}`
-        },
-        body: JSON.stringify(payload)
-      });
+        const response = await fetch(url, {
+            method,
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${tokenLocal}`
+            },
+            body: JSON.stringify(payload)
+        });
 
-      if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        console.error("Erro ao salvar:", error);
-        alert("Erro ao salvar edital: " + (error?.detail ? JSON.stringify(error.detail) : response.statusText));
-        return;
-      }
+        if (!response.ok) throw new Error("Erro ao salvar edital");
 
-      const data = await response.json();
-      console.log("✅ Edital salvo com sucesso:", data);
-      alert("Edital salvo com sucesso!");
-    } catch (err) {
-      console.error("Erro inesperado:", err);
-      alert("Erro inesperado ao salvar edital.");
+        // ✅ Redireciona para StudentDashboard com aba "Meus Editais" ativa
+        navigate("/painel-estudante", { state: { activeTab: "meusEditais" } });
+
+    } catch (error) {
+        console.error(error);
+        alert(error.message || "Erro inesperado ao salvar edital.");
     }
-  };
+};
 
   // --- Renderização da tabela ---
   const renderNoticeTable = () => {
@@ -509,8 +507,10 @@ const EditalVerticalizado = ({ token: tokenProp }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 p-4 md:p-8 font-sans">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+      <TopNav onLogout={onLogout} />
+      
+      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
         <header className="text-center">
         </header>
 
