@@ -42,33 +42,41 @@ export default function MeusErrosPainel({ token, API_URL, onUnauthorized }) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {questoesErradas.map((item, index) => (
-        <div key={index} className="bg-white p-6 rounded-xl shadow-md border border-gray-100 flex flex-col justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">
-              {item.question.materia} - {item.question.assunto}
-            </h3>
-            <p className="text-sm text-gray-600 mb-3 line-clamp-3" dangerouslySetInnerHTML={{ __html: item.question.enunciado }}></p>
-            <p className="text-xs text-gray-500 flex items-center">
+  <div className="space-y-4">
+    {questoesErradas.map((item, index) => (
+      <div
+        key={index}
+        className="bg-white rounded-xl shadow-md border border-gray-100 p-6 flex flex-col md:flex-row md:items-center justify-between w-full"
+      >
+        <div className="flex-1">
+          <h3 className="text-lg font-semibold text-gray-800 mb-1">
+            {item.question.materia} - {item.question.assunto}
+          </h3>
+          <p
+            className="text-sm text-gray-600 mb-2 line-clamp-2"
+            dangerouslySetInnerHTML={{ __html: item.question.enunciado }}
+          ></p>
+          <div className="flex items-center text-xs text-gray-500 space-x-4">
+            <span className="flex items-center">
               <BookOpen className="h-4 w-4 mr-1" /> Caderno: {item.notebook_name}
-            </p>
-            <p className="text-xs text-gray-500 flex items-center mt-1">
+            </span>
+            <span className="flex items-center">
               <Clock className="h-4 w-4 mr-1" /> Erro registrado
-            </p>
-          </div>
-          <div className="flex space-x-2 mt-4">
-            <button
-              onClick={() => navigate(`/resolver-caderno/${item.notebook_id}`)}
-              className="flex-1 flex items-center justify-center px-4 py-2 bg-blue-500 text-white rounded-lg shadow-sm hover:bg-blue-600 transition-colors text-sm font-medium"
-            >
-              <BookOpen className="mr-1" size={16} /> Ver Caderno
-            </button>
+            </span>
           </div>
         </div>
-      ))}
-    </div>
-  );
+        <div className="mt-4 md:mt-0 md:ml-6 flex-shrink-0">
+         <button
+    onClick={() => navigate(`/resolver-caderno/${item.notebook_id}`)}
+    className="ml-4 px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm hover:bg-blue-200 transition"
+>
+    Ver caderno
+</button>
+        </div>
+      </div>
+    ))}
+  </div>
+);
 }
 
 
