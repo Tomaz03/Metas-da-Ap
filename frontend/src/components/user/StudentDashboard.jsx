@@ -676,61 +676,64 @@ useEffect(() => {
     };
 
     const renderFavoriteQuestions = () => {
-        if (isLoadingFavorites) {
-            return (
-                <div className="flex justify-center items-center h-64">
-                    <Loader2 className="animate-spin h-8 w-8 text-blue-600" />
-                </div>
-            );
-        }
-
+    if (isLoadingFavorites) {
         return (
-            <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-                    <Star className="mr-3 text-yellow-500" size={24} /> Questões Favoritas
-                </h2>
-                
-                {favoriteQuestions.length === 0 ? (
-                    <div className="text-center py-10 text-gray-600">
-                        <Star className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                        <p>Você ainda não tem questões favoritas.</p>
-                        <p className="text-sm">Favorite questões durante a resolução para vê-las aqui.</p>
-                    </div>
-                ) : (
-                    <div className="grid gap-6">
-                        {favoriteQuestions.map((fav) => (
-                            <div key={`${fav.question_id}-${fav.notebook_id}`} className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow">
-                                <div className="flex-1">
-                                    <h3 className="text-lg font-semibold text-gray-800 mb-2">{fav.question.materia} - {fav.question.assunto}</h3>
-                                    <p className="text-sm text-gray-600 mb-3 line-clamp-3" dangerouslySetInnerHTML={{ __html: fav.question.enunciado }}></p>
-                                    <p className="text-xs text-gray-500 flex items-center">
-                                        <BookOpen className="h-4 w-4 mr-1" /> Caderno: {fav.notebook_name}
-                                    </p>
-                                    <p className="text-xs text-gray-500 flex items-center mt-1">
-                                        <Clock className="h-4 w-4 mr-1" /> Favoritado em: {new Date(fav.favorited_at).toLocaleDateString()}
-                                    </p>
-                                </div>
-                                <div className="flex space-x-2 mt-4">
-                                    <button
-                                        onClick={() => handleResolveFavorite(fav.notebook_id)}
-                                        className="flex-1 flex items-center justify-center px-4 py-2 bg-blue-500 text-white rounded-lg shadow-sm hover:bg-blue-600 transition-colors text-sm font-medium"
-                                    >
-                                        <BookOpen className="mr-1" size={16} /> Resolver Caderno
-                                    </button>
-                                    <button
-                                        onClick={() => handleRemoveFavoriteClick(fav)}
-                                        className="p-2 bg-red-500 text-white rounded-lg shadow-sm hover:bg-red-600 transition-colors"
-                                    >
-                                        <Star size={16} />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
+            <div className="flex justify-center items-center h-64">
+                <Loader2 className="animate-spin h-8 w-8 text-blue-600" />
             </div>
         );
-    };
+    }
+
+    return (
+        <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                <Star className="mr-3 text-yellow-500" size={24} /> Questões Favoritas
+            </h2>
+            
+            {favoriteQuestions.length === 0 ? (
+                <div className="text-center py-10 text-gray-600">
+                    <Star className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <p>Você ainda não tem questões favoritas.</p>
+                    <p className="text-sm">Favorite questões durante a resolução para vê-las aqui.</p>
+                </div>
+            ) : (
+                <div className="grid gap-6">
+                    {favoriteQuestions.map((fav) => (
+                        <div key={`${fav.question_id}-${fav.notebook_id}`} className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow relative">
+                            {/* Botões no canto superior direito */}
+                            <div className="absolute top-4 right-4 flex flex-col items-end">
+                                <button
+        onClick={() => handleResolveFavorite(fav.notebook_id)}
+        className="ml-4 px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm hover:bg-blue-200 transition mb-2"
+    >
+        Ver caderno
+    </button>
+    <button
+        onClick={() => handleRemoveFavoriteClick(fav)}
+        className="p-2 bg-yellow-500 text-white rounded-lg shadow-sm hover:bg-yellow-600 transition-colors"
+        title="Desfavoritar"
+    >
+        <Star size={16} />
+    </button>
+                            </div>
+                            
+                            <div className="pr-16">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-2">{fav.question.materia} - {fav.question.assunto}</h3>
+                                <p className="text-sm text-gray-600 mb-3 line-clamp-3" dangerouslySetInnerHTML={{ __html: fav.question.enunciado }}></p>
+                                <p className="text-xs text-gray-500 flex items-center">
+                                    <BookOpen className="h-4 w-4 mr-1" /> Caderno: {fav.notebook_name}
+                                </p>
+                                <p className="text-xs text-gray-500 flex items-center mt-1">
+                                    <Clock className="h-4 w-4 mr-1" /> Favoritado em: {new Date(fav.favorited_at).toLocaleDateString()}
+                                </p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
 
     const renderMyComments = () => {
         return (
@@ -969,21 +972,22 @@ const renderActiveSectionContent = () => {
 };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
-            <TopNav onLogout={onLogout} />
-            <main className="flex-1 container mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">
-                {/* Painel Lateral (Sidebar) */}
-                <aside className="w-full md:w-64 p-4 bg-white rounded-xl shadow-lg border border-gray-100 flex flex-col items-start space-y-2">
-                    <h2 className="text-2xl font-bold text-gray-800 mb-4 self-center">Meu Painel</h2>
-                    
-                    {/* Botões de navegação lateral */}
-                    <button
-                        onClick={() => setActiveSection('estatisticas')}
-                        className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 
-                            ${activeSection === 'estatisticas' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-100'}`}
-                    >
-                        <TrendingUp className="mr-3" size={20} /> Estatísticas
-                    </button>
+        <div className="h-screen bg-gray-50 flex flex-col">
+        <TopNav onLogout={onLogout} />
+        {/* Removido container e mx-auto, ajustado padding */}
+        <main className="flex-1 flex flex-col md:flex-row gap-0 overflow-hidden px-0">
+            {/* Painel Lateral (Sidebar) - removido rounded-xl, adicionado ml-0 */}
+            <aside className="w-full md:w-64 p-4 bg-white shadow-lg border-r border-gray-100 flex flex-col items-start space-y-2 h-full overflow-y-auto ml-0">
+                <h2 className="text-2xl font-bold text-gray-800 mb-4 self-center">Meu Painel</h2>
+                
+                {/* Botões de navegação lateral */}
+                <button
+                    onClick={() => setActiveSection('estatisticas')}
+                    className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 
+                        ${activeSection === 'estatisticas' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-100'}`}
+                >
+                    <TrendingUp className="mr-3" size={20} /> Estatísticas
+                </button>
                     <button
                         onClick={() => setActiveSection('favorites')}
                         className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 
