@@ -245,7 +245,7 @@ export default function QuestionSearch({ token, onLogout }) {
                 console.log('Questão não encontrada por ID ou erro, tentando por enunciado...');
             }
 
-            url = `${API_URL}/api/questions/search?q=${encodeURIComponent(searchTerm.trim())}`;
+            url = `${API_URL}/api/questions/buscar?q=${encodeURIComponent(searchTerm.trim())}`;
             const res = await fetch(url, {
                 headers: { Authorization: `Bearer ${token}` },
             });
@@ -1286,7 +1286,7 @@ useEffect(() => {
 
             <Fragment>
                 <div className="min-h-screen bg-gray-100 flex flex-col">
-                    <div className="flex-grow container mx-auto p-4 sm:p-6 lg:p-8">
+                    <div className="flex-grow container mx-auto p-4 sm:p-6 lg:p-8 w-full">
                         <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">Buscar Questão</h1>
 
                         <div className="bg-white rounded-xl shadow-lg p-6 mb-10 w-full max-w-3xl mx-auto border border-gray-200">
@@ -1332,9 +1332,9 @@ useEffect(() => {
 
                         {/* Exibição da Questão - Mantida como está */}
                         {foundQuestion && (
-                            <div className="bg-white rounded-lg shadow-md p-6 w-full mx-auto">
+                             <div className="bg-white rounded-lg shadow-md p-6 w-full mx-auto">
                                 <div className="mb-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2 text-base text-gray-700 mb-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-2 text-base text-gray-700 mb-4">
                                         <div><strong className="text-gray-800">Questão ID:</strong> {foundQuestion.id}</div>
                                         <div><strong className="text-gray-800">Matéria:</strong> {foundQuestion.materia}</div>
                                         <div><strong className="text-gray-800">Assunto:</strong> {foundQuestion.assunto}</div>
@@ -1554,7 +1554,7 @@ useEffect(() => {
                                     )}
                                 </div>
 
-                                <div className="mt-8 flex flex-col bg-white rounded-lg shadow-md border border-gray-200">
+                                <div className="mt-8 flex flex-col bg-white rounded-lg shadow-md border border-gray-200 w-full">
                                     <div className="flex border-b border-gray-200">
                                         <TabButton
                                             icon={<BookOpen className="w-5 h-5" />}
