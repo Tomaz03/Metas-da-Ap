@@ -98,6 +98,13 @@ export default function MyNotebooks({ token, onLogout }) {
         notebook.nome.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    // Ordenar notebooks: pastas primeiro, depois cadernos, ambos em ordem alfabética
+    const sortedNotebooks = [...filteredNotebooks].sort((a, b) => {
+        if (a.tipo === 'pasta' && b.tipo !== 'pasta') return -1;
+        if (a.tipo !== 'pasta' && b.tipo === 'pasta') return 1;
+        return a.nome.localeCompare(b.nome, 'pt', { sensitivity: 'base' });
+    });
+
     const handleDeleteClick = (notebook) => {
         console.log('handleDeleteClick acionado para:', notebook.nome);
         setNotebookToDelete(notebook);
@@ -257,89 +264,93 @@ export default function MyNotebooks({ token, onLogout }) {
                 />
               )}
 
-            <main className="max-w-7xl mx-auto p-6 pt-8">
-                <div className="mb-8 flex justify-between items-center">
-                    <h2 className="text-3xl font-bold text-gray-800">Meus Cadernos e Pastas</h2>
-                    <div className="flex gap-3">
+            <main className="w-full p-6 pt-8"> {/* Removido max-w-7xl mx-auto que centralizava o conteúdo */}
+    <div className="mb-8 flex justify-between items-center px-4"> {/* Adicionado px-4 para alinhamento lateral */}
+        <h2 className="text-3xl font-bold text-gray-800">Meus Cadernos e Pastas</h2>
+        <div className="flex gap-3">
+            <button
+                onClick={() => navigate('/novo-caderno')}
+                className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md flex items-center transition-transform transform hover:scale-105"
+            >
+                <PlusCircle className="h-5 w-5 mr-2" /> Novo Caderno
+            </button>
+            <button
+                onClick={() => navigate('/nova-pasta')}
+                className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md flex items-center transition-transform transform hover:scale-105"
+            >
+                <FolderPlus className="h-5 w-5 mr-2" /> Nova Pasta
+            </button>
+        </div>
+    </div>
+
+    <div className="mb-8 relative px-4"> {/* Adicionado px-4 para alinhamento lateral */}
+        <input
+            type="text"
+            placeholder="Pesquisar cadernos ou pastas..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm text-gray-800 transition-colors"
+        />
+        <Search className="absolute left-7 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" /> {/* Ajustado left-7 para compensar o padding */}
+    </div>
+
+    {isLoading ? (
+    <div className="flex items-center justify-center py-10">
+        <Loader2 className="animate-spin h-8 w-8 text-blue-600" />
+        <p className="ml-3 text-lg text-gray-700">Carregando seus cadernos...</p>
+    </div>
+) : (
+    <div className="grid grid-cols-1 gap-4 px-4"> {/* Uma coluna por vez */}
+        {sortedNotebooks.length > 0 ? (
+            sortedNotebooks.map((notebook) => (
+                <div
+                    key={notebook.id}
+                    className={`bg-white rounded-xl shadow-md border border-gray-100 p-6 flex flex-col md:flex-row md:items-center justify-between w-full cursor-pointer hover:shadow-lg transition-all duration-300
+                        ${notebook.tipo === 'pasta' ? 'bg-yellow-50 hover:bg-yellow-100' : 'bg-white hover:bg-gray-50'}
+                    `}
+                    onClick={() => handleOpenNotebook(notebook.id, notebook.tipo)}
+                >
+                    <div className="flex-1">
+                        <h3 className={`text-lg font-semibold mb-1 flex items-center ${notebook.tipo === 'pasta' ? 'text-yellow-800' : 'text-blue-800'}`}>
+                            {notebook.tipo === 'pasta'
+                                ? <Folder className="h-5 w-5 mr-2" />
+                                : <Book className="h-5 w-5 mr-2" />}
+                            {notebook.nome}
+                        </h3>
+                        {renderEstatisticas(notebook)}
+                    </div>
+                    <div className="mt-4 md:mt-0 md:ml-6 flex-shrink-0 flex space-x-2">
                         <button
-                            onClick={() => navigate('/novo-caderno')}
-                            className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md flex items-center transition-transform transform hover:scale-105"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleRenameClick(notebook);
+                            }}
+                            className="text-blue-600 hover:text-blue-800 p-2 rounded-full hover:bg-blue-50 transition-colors"
+                            title="Renomear"
                         >
-                            <PlusCircle className="h-5 w-5 mr-2" /> Novo Caderno
+                            <Edit className="h-5 w-5" />
                         </button>
                         <button
-                            onClick={() => navigate('/nova-pasta')}
-                            className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md flex items-center transition-transform transform hover:scale-105"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClick(notebook);
+                            }}
+                            className="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-50 transition-colors"
+                            title="Excluir"
                         >
-                            <FolderPlus className="h-5 w-5 mr-2" /> Nova Pasta
+                            <Trash2 className="h-5 w-5" />
                         </button>
                     </div>
                 </div>
-
-                <div className="mb-8 relative">
-                    <input
-                        type="text"
-                        placeholder="Pesquisar cadernos ou pastas..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm text-gray-800 transition-colors"
-                    />
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
-                </div>
-
-                {isLoading ? (
-                    <div className="flex items-center justify-center py-10">
-                        <Loader2 className="animate-spin h-8 w-8 text-blue-600" />
-                        <p className="ml-3 text-lg text-gray-700">Carregando seus cadernos...</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {filteredNotebooks.length > 0 ? (
-                            filteredNotebooks.map((notebook) => (
-                                <div
-                                    key={notebook.id}
-                                    className={`relative p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 flex flex-col justify-between cursor-pointer transform hover:scale-[1.02]
-                                        ${notebook.tipo === 'pasta' ? 'bg-yellow-50 hover:bg-yellow-100' : 'bg-white hover:bg-gray-50'}
-                                    `}
-                                    onClick={() => handleOpenNotebook(notebook.id, notebook.tipo)}
-                                >
-                                    <div>
-                                        <h3 className={`text-xl font-bold text-gray-800 mb-2 flex items-center ${notebook.tipo === 'pasta' ? 'text-yellow-800' : 'text-blue-800'}`}>
-                                            {notebook.tipo === 'pasta' ? <Folder className="h-6 w-6 mr-2" /> : <Book className="h-6 w-6 mr-2" />}
-                                            {notebook.nome}
-                                        </h3>
-                                        {renderEstatisticas(notebook)}
-                                    </div>
-                                    <div className="mt-4 flex justify-end space-x-2 z-10">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleRenameClick(notebook);
-                                            }}
-                                            className="text-blue-600 hover:text-blue-800 p-2 rounded-full hover:bg-blue-50 transition-colors"
-                                            title="Renomear"
-                                        >
-                                            <Edit className="h-5 w-5" />
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteClick(notebook);
-                                            }}
-                                            className="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-50 transition-colors"
-                                            title="Excluir"
-                                        >
-                                            <Trash2 className="h-5 w-5" />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="text-gray-500 text-center py-10 col-span-full">Nenhum caderno ou pasta encontrado. Crie um novo para começar!</p>
-                        )}
-                    </div>
-                )}
-            </main>
+            ))
+        ) : (
+            <p className="text-gray-500 text-center py-10 col-span-full">
+                Nenhum caderno ou pasta encontrado. Crie um novo para começar!
+            </p>
+        )}
+    </div>
+)}                      
+</main>
 
             <ActionModal
                 isOpen={showDeleteModal}
