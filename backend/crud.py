@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, joinedload
-from . import models, schemas
+from backend import models, schemas
 from typing import List, Optional, Dict, Any, Union
 from sqlalchemy import distinct, func
 import json
@@ -1359,14 +1359,22 @@ def update_syllabus(db: Session, syllabus_id: int, user_id: int, syllabus_update
     return db_syllabus
 
 def delete_syllabus(db: Session, syllabus_id: int, user_id: int):
-    """
-    Deletes a verticalized syllabus.
-    """
-    db_syllabus = get_syllabus_by_id(db, syllabus_id, user_id)
-    if db_syllabus:
-        db.delete(db_syllabus)
+    # 🔹 Excluir todos os registros do calendário de estudos vinculados ao edital
+    db.query(models.StudyCalendar).filter(
+        models.StudyCalendar.edital_id == syllabus_id
+    ).delete()
+
+    # 🔹 Buscar e excluir o edital
+    syllabus = db.query(models.VerticalizedSyllabus).filter(
+        models.VerticalizedSyllabus.id == syllabus_id,
+        models.VerticalizedSyllabus.user_id == user_id
+    ).first()
+
+    if syllabus:
+        db.delete(syllabus)
         db.commit()
         return True
+
     return False
 
 # --- ADICIONE A FUNÇÃO ABAIXO NESTE LOCAL ---
