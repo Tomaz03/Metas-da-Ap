@@ -997,230 +997,207 @@ const filteredAndSortedComments = React.useMemo(() => {
 
     // Funções de renderização das abas (mantidas para clareza, mas agora chamadas por renderActiveTabContent)
     const renderQuestionContent = () => (
-        <>
-            {/* Botão de Favoritar */}
-            <button
-                onClick={handleFavoriteToggle}
-                className="absolute top-4 right-4 p-2 rounded-full transition-all duration-300 transform hover:scale-110"
-                title={questao.isFavorited ? "Remover dos Favoritos" : "Adicionar aos Favoritos"}
+  <div className="relative pt-12"> {/* Contêiner relativo e espaçamento superior */}
+    {/* Botão de Favoritar */}
+    <button
+      onClick={handleFavoriteToggle}
+      className="absolute top-4 right-4 p-2 rounded-full transition-all duration-300 transform hover:scale-110"
+      title={questao.isFavorited ? "Remover dos Favoritos" : "Adicionar aos Favoritos"}
+    >
+      <Star className={`w-8 h-8 ${questao.isFavorited ? 'text-yellow-500 fill-current' : 'text-gray-400'}`} />
+    </button>
+
+    {/* Exibição do status Anulada/Desatualizada */}
+    {questao.isAnulada && (
+      <div className="bg-red-100 text-red-700 p-3 rounded-lg mb-4 flex items-center justify-center font-semibold text-lg border border-red-300">
+        <XCircle className="w-6 h-6 mr-2" /> Questão Anulada
+      </div>
+    )}
+    {questao.isDesatualizada && !questao.isAnulada && (
+      <div className="bg-yellow-100 text-yellow-700 p-3 rounded-lg mb-4 flex items-center justify-center font-semibold text-lg border border-yellow-300">
+        <XCircle className="w-6 h-6 mr-2" /> Questão Desatualizada
+      </div>
+    )}
+
+    {questao.informacoes && (
+      <div
+        className="text-sm text-gray-700 mb-4 font-bold prose prose-sm max-w-none break-words"
+        dangerouslySetInnerHTML={{ __html: removePTags(questao.informacoes) }}
+      />
+    )}
+
+    <div
+      className="text-base text-gray-800 font-medium mb-6 leading-relaxed text-justify prose prose-sm max-w-none break-words"
+      dangerouslySetInnerHTML={{ __html: removePTags(questao.enunciado) }}
+    />
+
+    {questao.tipo === 'multipla' && (
+      <ul className="space-y-3 mb-6">
+        {alternativas.map((alt, i) => (
+          <li key={i}>
+            <label
+              className={`flex items-start space-x-3 p-4 rounded-lg transition-all duration-200 cursor-pointer ${
+                mostrarFeedback && respostaUsuario === i
+                  ? respostaUsuario === questao.correta
+                    ? 'bg-green-100 border border-green-300'
+                    : 'bg-red-100 border border-red-300'
+                  : cliquesPorAlternativa[i] === 1
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white hover:bg-gray-50'
+              }`}
+              onClick={(e) => {
+                if (!mostrarFeedback) {
+                  e.preventDefault();
+                  handleAlternativaClick(i);
+                }
+              }}
             >
-                <Star className={`w-8 h-8 ${questao.isFavorited ? 'text-yellow-500 fill-current' : 'text-gray-400'}`} />
-            </button>
+              <input
+                type="radio"
+                name="alternativa"
+                className={`mt-1 h-4 w-4 ${cliquesPorAlternativa[i] === 1 ? 'text-white' : 'text-blue-600'} focus:ring-blue-500`}
+                disabled={mostrarFeedback}
+                checked={respostaUsuario === i}
+                onChange={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleAlternativaClick(i);
+                }}
+              />
+              <span
+                className={`text-sm ${cliquesPorAlternativa[i] === 0 ? 'line-through opacity-60 text-gray-500' : ''}`}
+                dangerouslySetInnerHTML={{ __html: `<strong class="mr-1">${letras[i]}.</strong> ${removePTags(alt)}` }}
+              />
+            </label>
+          </li>
+        ))}
+      </ul>
+    )}
 
-            {/* Exibição do status Anulada/Desatualizada */}
-            {questao.isAnulada && (
-                <div className="bg-red-100 text-red-700 p-3 rounded-lg mb-4 flex items-center justify-center font-semibold text-lg border border-red-300">
-                    <XCircle className="w-6 h-6 mr-2" /> Questão Anulada
-                </div>
-            )}
-            {questao.isDesatualizada && !questao.isAnulada && ( /* Mostra desatualizada apenas se não for anulada */
-                <div className="bg-yellow-100 text-yellow-700 p-3 rounded-lg mb-4 flex items-center justify-center font-semibold text-lg border border-yellow-300">
-                    <XCircle className="w-6 h-6 mr-2" /> Questão Desatualizada
-                </div>
-            )}
+    {questao.tipo === 'certo_errado' && (
+      <div className="flex flex-col space-y-2 mb-6">
+        <label
+          className={`flex items-center space-x-2 py-3 px-6 rounded-lg transition-all duration-200 cursor-pointer ${
+            cliquesPorAlternativa[1] === 1 && !mostrarFeedback
+              ? 'bg-blue-100 border border-blue-300'
+              : mostrarFeedback && respostaUsuario === 1
+                ? (respostaUsuario === questao.correta ? 'bg-green-600 text-white shadow-md' : 'bg-red-600 text-white shadow-md')
+                : mostrarFeedback && questao.correta === 1 && respostaUsuario !== questao.correta
+                  ? 'bg-green-200 text-gray-800 opacity-70'
+                  : 'bg-white hover:bg-gray-50'
+          }`}
+        >
+          <input
+            type="radio"
+            name="certoErrado"
+            checked={cliquesPorAlternativa[1] === 1}
+            onChange={() => handleAlternativaClick(1)}
+            disabled={mostrarFeedback}
+            className={`mt-1 h-4 w-4 ${(cliquesPorAlternativa[1] === 1 && !mostrarFeedback) ? 'text-blue-600' : 'text-gray-600'} focus:ring-blue-500`}
+          />
+          <span className={`${(mostrarFeedback && (questao.correta === 1 || respostaUsuario === 1)) ? 'text-white' : 'text-gray-800'}`}>Certo</span>
+        </label>
 
-            {questao.informacoes && (
-                <div
-                    className="text-sm text-gray-700 mb-4 font-bold prose prose-sm max-w-none break-words"
-                    dangerouslySetInnerHTML={{ __html: removePTags(questao.informacoes) }}
-                />
-            )}
+        <label
+          className={`flex items-center space-x-2 py-3 px-6 rounded-lg transition-all duration-200 cursor-pointer ${
+            cliquesPorAlternativa[0] === 1 && !mostrarFeedback
+              ? 'bg-blue-100 border border-blue-300'
+              : mostrarFeedback && respostaUsuario === 0
+                ? (respostaUsuario === questao.correta ? 'bg-green-600 text-white shadow-md' : 'bg-red-600 text-white shadow-md')
+                : mostrarFeedback && questao.correta === 0 && respostaUsuario !== questao.correta
+                  ? 'bg-green-200 text-gray-800 opacity-70'
+                  : 'bg-white hover:bg-gray-50'
+          }`}
+        >
+          <input
+            type="radio"
+            name="certoErrado"
+            checked={cliquesPorAlternativa[0] === 1}
+            onChange={() => handleAlternativaClick(0)}
+            disabled={mostrarFeedback}
+            className={`mt-1 h-4 w-4 ${(cliquesPorAlternativa[0] === 1 && !mostrarFeedback) ? 'text-blue-600' : 'text-gray-600'} focus:ring-blue-500`}
+          />
+          <span className={`${(mostrarFeedback && (questao.correta === 0 || respostaUsuario === 0)) ? 'text-white' : 'text-gray-800'}`}>Errado</span>
+        </label>
+      </div>
+    )}
 
-            <div
-                className="text-base text-gray-800 font-medium mb-6 leading-relaxed text-justify prose prose-sm max-w-none break-words"
-                dangerouslySetInnerHTML={{ __html: removePTags(questao.enunciado) }}
-            />
+    {!mostrarFeedback && (
+      <button
+        onClick={handleConfirmar}
+        disabled={respostaUsuario === null}
+        className={`w-full py-3 rounded-lg font-semibold text-lg transition-all duration-300 ${
+          respostaUsuario === null ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg'
+        }`}
+      >
+        Confirmar Resposta
+      </button>
+    )}
 
-            {questao.tipo === 'multipla' && (
-                <ul className="space-y-3 mb-6">
-                    {alternativas.map((alt, i) => (
-                        <li key={i}>
-                            <label
-                                className={`flex items-start space-x-3 p-4 rounded-lg transition-all duration-200 cursor-pointer ${
-                                    mostrarFeedback && respostaUsuario === i
-                                        ? respostaUsuario === questao.correta
-                                            ? 'bg-green-100 border border-green-300'
-                                            : 'bg-red-100 border border-red-300'
-                                        : cliquesPorAlternativa[i] === 1
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-white hover:bg-gray-50'
-                                }`}
-                                onClick={(e) => {
-                                    if (!mostrarFeedback) {
-                                        e.preventDefault();
-                                        handleAlternativaClick(i);
-                                    }
-                                }}
-                            >
-                                <input
-                                    type="radio"
-                                    name="alternativa"
-                                    className={`mt-1 h-4 w-4 ${
-                                        cliquesPorAlternativa[i] === 1 ? 'text-white' : 'text-blue-600'
-                                    } focus:ring-blue-500`}
-                                    disabled={mostrarFeedback}
-                                    checked={respostaUsuario === i}
-                                    onChange={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        handleAlternativaClick(i);
-                                    }}
-                                />
-                                <span
-                                    className={`text-sm ${
-                                        cliquesPorAlternativa[i] === 0
-                                            ? 'line-through opacity-60 text-gray-500' 
-                                            : ''
-                                    }`}
-                                    dangerouslySetInnerHTML={{ __html: `<strong class="mr-1">${letras[i]}.</strong> ${removePTags(alt)}` }}
-                                />
-                            </label>
-                        </li>
-                    ))}
-                </ul>
-            )}
+    {mostrarFeedback && (
+      <div className="mt-4 p-4 rounded-lg bg-gray-50">
+        <div className="flex items-center">
+          {respostaUsuario === questao.correta ? (
+            <p className="text-green-600 font-semibold flex items-center">
+              <CheckCircle className="w-5 h-5 mr-2" /> Você acertou!
+            </p>
+          ) : (
+            <p className="text-red-600 font-semibold flex items-center">
+              <XCircle className="w-5 h-5 mr-2" /> Você errou.
+            </p>
+          )}
+        </div>
+        {questao.gabarito && (
+          <p className="mt-2 text-sm text-gray-700">
+            Gabarito: <strong>{questao.gabarito}</strong>
+          </p>
+        )}
+      </div>
+    )}
 
-            {questao.tipo === 'certo_errado' && (
-                <div className="flex flex-col space-y-2 mb-6">
-                    <label
-                        className={`flex items-center space-x-2 py-3 px-6 rounded-lg transition-all duration-200 cursor-pointer ${
-                            cliquesPorAlternativa[1] === 1 && !mostrarFeedback
-                                ? 'bg-blue-100 border border-blue-300'
-                                : mostrarFeedback && respostaUsuario === 1
-                                    ? (respostaUsuario === questao.correta ? 'bg-green-600 text-white shadow-md' : 'bg-red-600 text-white shadow-md')
-                                    : mostrarFeedback && questao.correta === 1 && respostaUsuario !== questao.correta
-                                        ? 'bg-green-200 text-gray-800 opacity-70'
-                                        : 'bg-white hover:bg-gray-50'
-                        }`}
-                    >
-                        <input
-                            type="radio"
-                            name="certoErrado"
-                            checked={cliquesPorAlternativa[1] === 1}
-                            onChange={() => handleAlternativaClick(1)}
-                            disabled={mostrarFeedback}
-                            className={`mt-1 h-4 w-4 ${
-                                (cliquesPorAlternativa[1] === 1 && !mostrarFeedback) ? 'text-blue-600' : 'text-gray-600'
-                            } focus:ring-blue-500`}
-                        />
-                        <span className={`${
-                            (mostrarFeedback && (questao.correta === 1 || respostaUsuario === 1)) ? 'text-white' : 'text-gray-800'
-                        }`}>Certo</span>
-                    </label>
-                    <label
-                        className={`flex items-center space-x-2 py-3 px-6 rounded-lg transition-all duration-200 cursor-pointer ${
-                            cliquesPorAlternativa[0] === 1 && !mostrarFeedback
-                                ? 'bg-blue-100 border border-blue-300'
-                                : mostrarFeedback && respostaUsuario === 0
-                                    ? (respostaUsuario === questao.correta ? 'bg-green-600 text-white shadow-md' : 'bg-red-600 text-white shadow-md')
-                                    : mostrarFeedback && questao.correta === 0 && respostaUsuario !== questao.correta
-                                        ? 'bg-green-200 text-gray-800 opacity-70'
-                                        : 'bg-white hover:bg-gray-50'
-                        }`}
-                    >
-                        <input
-                            type="radio"
-                            name="certoErrado"
-                            checked={cliquesPorAlternativa[0] === 1}
-                            onChange={() => handleAlternativaClick(0)}
-                            disabled={mostrarFeedback}
-                            className={`mt-1 h-4 w-4 ${
-                                (cliquesPorAlternativa[0] === 1 && !mostrarFeedback) ? 'text-blue-600' : 'text-gray-600'
-                            } focus:ring-blue-500`}
-                        />
-                        <span className={`${
-                            (mostrarFeedback && (questao.correta === 0 || respostaUsuario === 0)) ? 'text-white' : 'text-gray-800'
-                        }`}>Errado</span>
-                    </label>
-                </div>
-            )}
+    <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <button
+        onClick={retroceder}
+        disabled={indiceAtual === 0}
+        className={`flex items-center justify-center px-4 py-2 rounded-lg font-semibold transition-all duration-300 ${
+          indiceAtual === 0 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg transform hover:-translate-x-1'
+        }`}
+      >
+        <ChevronLeft className="w-5 h-5 mr-1" /> Anterior
+      </button>
 
-            {!mostrarFeedback && (
-                <button
-                    onClick={handleConfirmar}
-                    disabled={respostaUsuario === null}
-                    className={`w-full py-3 rounded-lg font-semibold text-lg transition-all duration-300
-                        ${respostaUsuario === null
-                            ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                            : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg'
-                        }`}
-                >
-                    Confirmar Resposta
-                </button>
-            )}
+      <button
+        onClick={avancar}
+        disabled={indiceAtual >= questoes.length - 1}
+        className={`flex items-center justify-center px-4 py-2 rounded-lg font-semibold transition-all duration-300 ${
+          indiceAtual >= questoes.length - 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg transform hover:translate-x-1'
+        }`}
+      >
+        Próxima <ChevronRight className="w-5 h-5 ml-1" />
+      </button>
 
-            {mostrarFeedback && (
-                <div className="mt-4 p-4 rounded-lg bg-gray-50">
-                    <div className="flex items-center">
-                        {respostaUsuario === questao.correta ? (
-                            <p className="text-green-600 font-semibold flex items-center">
-                                <CheckCircle className="w-5 h-5 mr-2" /> Você acertou!
-                            </p>
-                        ) : (
-                            <p className="text-red-600 font-semibold flex items-center">
-                                <XCircle className="w-5 h-5 mr-2" /> Você errou.
-                            </p>
-                        )}
-                    </div>
-                    {questao.gabarito && (
-                        <p className="mt-2 text-sm text-gray-700">
-                            Gabarito: <strong>{questao.gabarito}</strong>
-                        </p>
-                    )}
-                </div>
-            )}
+      <button
+        onClick={retrocederAssunto}
+        disabled={getAssunto().indexOf(questao?.assunto) === 0}
+        className={`flex items-center justify-center px-4 py-2 rounded-lg font-semibold transition-all duration-300 ${
+          getAssunto().indexOf(questao?.assunto) === 0 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg transform hover:-translate-x-1'
+        }`}
+      >
+        <ChevronsLeft className="w-5 h-5 mr-1" /> Assunto Anterior
+      </button>
 
-            <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <button
-                    onClick={retroceder}
-                    disabled={indiceAtual === 0}
-                    className={`flex items-center justify-center px-4 py-2 rounded-lg font-semibold transition-all duration-300
-                        ${indiceAtual === 0
-                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                            : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg transform hover:-translate-x-1'
-                        }`}
-                >
-                    <ChevronLeft className="w-5 h-5 mr-1" /> Anterior
-                </button>
-
-                <button
-                    onClick={avancar}
-                    disabled={indiceAtual >= questoes.length - 1}
-                    className={`flex items-center justify-center px-4 py-2 rounded-lg font-semibold transition-all duration-300
-                        ${indiceAtual >= questoes.length - 1
-                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                            : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg transform hover:translate-x-1'
-                        }`}
-                >
-                    Próxima <ChevronRight className="w-5 h-5 ml-1" />
-                </button>
-
-                <button
-                    onClick={retrocederAssunto}
-                    disabled={getAssunto().indexOf(questao?.assunto) === 0}
-                    className={`flex items-center justify-center px-4 py-2 rounded-lg font-semibold transition-all duration-300
-                        ${getAssunto().indexOf(questao?.assunto) === 0
-                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                            : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg transform hover:-translate-x-1'
-                        }`}
-                >
-                    <ChevronsLeft className="w-5 h-5 mr-1" /> Assunto Anterior
-                </button>
-
-                <button
-                    onClick={avancarAssunto}
-                    disabled={getAssunto().indexOf(questao?.assunto) === getAssunto().length - 1}
-                    className={`flex items-center justify-center px-4 py-2 rounded-lg font-semibold transition-all duration-300
-                        ${getAssunto().indexOf(questao?.assunto) === getAssunto().length - 1
-                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                            : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg transform hover:translate-x-1'
-                        }`}
-                >
-                    Próximo Assunto <ChevronsRight className="w-5 h-5 ml-1" />
-                </button>
-            </div>
-        </>
-    );
+      <button
+        onClick={avancarAssunto}
+        disabled={getAssunto().indexOf(questao?.assunto) === getAssunto().length - 1}
+        className={`flex items-center justify-center px-4 py-2 rounded-lg font-semibold transition-all duration-300 ${
+          getAssunto().indexOf(questao?.assunto) === getAssunto().length - 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg transform hover:translate-x-1'
+        }`}
+      >
+        Próximo Assunto <ChevronsRight className="w-5 h-5 ml-1" />
+      </button>
+    </div>
+  </div>
+);
 
     const renderComentarioProfessor = () => (
         <div className="relative bg-white border-l-4 border-black-500 p-6 rounded-lg min-h-[400px]">
@@ -1568,14 +1545,16 @@ const filteredAndSortedComments = React.useMemo(() => {
     const letras = ['A', 'B', 'C', 'D', 'E'];
 
     return (
-        <>
-            <TopNav onLogout={onLogout} />
-            <main className="max-w-[1500px] mx-auto px-4 py-8 sm:px-6 lg:px-8">
-                <div className="text-center mb-8">
-                    <h1 className="text-3xl font-extrabold text-gray-900">
+    <>
+        <TopNav onLogout={onLogout} />
+        <main className="w-full px-0 py-0 bg-gray-50 min-h-screen">
+            {/* Cabeçalho */}
+            <div className="w-full bg-white shadow-sm py-4">
+                <div className="w-full px-6">
+                    <h1 className="text-2xl font-extrabold text-gray-900 text-center">
                         Caderno: <span className="text-blue-600">{nomeCaderno}</span>
                     </h1>
-                    <div className="mt-2 text-sm font-bold">
+                    <div className="mt-2 text-sm font-bold text-center">
                         <span className="text-black">Questão {indiceAtual + 1} de {questoes.length}</span>
                         <span className="mx-2">|</span>
                         <span className="text-blue-600">Resolvidas: {resolvidas}</span>
@@ -1585,9 +1564,9 @@ const filteredAndSortedComments = React.useMemo(() => {
                         <span className="text-red-600">Erros: {erros}</span>
                     </div>
                     {questao && (
-                        <div className="mt-4 text-sm text-gray-700">
+                        <div className="mt-2 text-sm text-gray-700 text-center">
                             <p>
-                                <span className="font-semibold">ID da Questão:</span> {questao.id}
+                                <span className="font-semibold">ID:</span> {questao.id}
                                 <span className="mx-2">|</span>
                                 <span className="font-semibold">Matéria:</span> {questao.materia}
                                 <span className="mx-2">|</span>
@@ -1596,88 +1575,74 @@ const filteredAndSortedComments = React.useMemo(() => {
                         </div>
                     )}
                 </div>
+            </div>
 
-                {mensagem && (
-                    <MessageModal
-                        message={mensagem}
-                        type={tipoMensagem}
-                        onClose={() => setMensagem('')}
-                    />
-                )}
+            {mensagem && (
+                <MessageModal
+                    message={mensagem}
+                    type={tipoMensagem}
+                    onClose={() => setMensagem('')}
+                />
+            )}
 
-                <div className="bg-white rounded-xl shadow-lg p-6 transition-all duration-300 flex">
-                    <aside className="w-72 bg-blue-800 p-6 rounded-l-xl flex flex-col space-y-4 shadow-xl">
-                        {[
-                            { id: 'questionContent', icon: BookOpen, label: 'Questão' },
-                            { id: 'comentarioProfessor', icon: BookOpen, label: 'Comentários do Professor' },
-                            { id: 'comentarioAluno', icon: MessageSquare, label: 'Comentários dos Alunos' },
-                            { id: 'teoria', icon: FileText, label: 'Teoria da Questão' },
-                            { id: 'estatistica', icon: BarChart, label: 'Estatística da Questão' },
-                            { id: 'anotacoes', icon: ClipboardList, label: 'Anotações' } 
-                        ].map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => {
-                                    setAbaAtiva(tab.id);
-                                    if (tab.id !== 'comentarioAluno') {
-                                        setShowCommentEditor(false);
-                                        setEditingComment(null);
-                                        setNewCommentContent('');
-                                        setEditingCommentContent('');
-                                    }
-                                }}
-                                className={`w-full flex items-center px-6 py-4 rounded-xl text-base font-semibold transition-all duration-300 transform
-                                    ${abaAtiva === tab.id
-                                        ? 'bg-white text-blue-800 shadow-lg ring-2 ring-blue-400'
-                                        : 'text-blue-200 hover:bg-blue-700 hover:text-white hover:shadow-md hover:translate-x-1'
-                                    }`}
-                            >
-                                <tab.icon className={`w-6 h-6 mr-4 ${abaAtiva === tab.id ? 'text-blue-600' : 'text-blue-300'}`} />
-                                {tab.label}
-                            </button>
-                        ))}
-                    </aside>
-
-                    <div className="flex-1 p-6 relative">
-                        {/* Botão de fechar painel lateral, se necessário */}
-                        {(abaAtiva !== 'questionContent' && abaAtiva !== 'teoria' && abaAtiva !== 'estatistica' && abaAtiva !== 'comentarioProfessor' && abaAtiva !== 'comentarioAluno' && abaAtiva !== 'anotacoes') && (
-                            <button
-                                onClick={() => {
-                                    setAbaAtiva('questionContent'); // Volta para a aba de questão principal
+            {/* Corpo Principal */}
+            <div className="flex w-full">
+                {/* Sidebar - Mantido igual mas removido rounded-l-xl */}
+                <aside className="w-72 bg-blue-800 p-6 flex flex-col space-y-4 shadow-xl">
+                    {[
+                        { id: 'questionContent', icon: BookOpen, label: 'Questão' },
+                        { id: 'comentarioProfessor', icon: BookOpen, label: 'Comentários do Professor' },
+                        { id: 'comentarioAluno', icon: MessageSquare, label: 'Comentários dos Alunos' },
+                        { id: 'teoria', icon: FileText, label: 'Teoria da Questão' },
+                        { id: 'estatistica', icon: BarChart, label: 'Estatística da Questão' },
+                        { id: 'anotacoes', icon: ClipboardList, label: 'Anotações' } 
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => {
+                                setAbaAtiva(tab.id);
+                                if (tab.id !== 'comentarioAluno') {
                                     setShowCommentEditor(false);
                                     setEditingComment(null);
                                     setNewCommentContent('');
                                     setEditingCommentContent('');
-                                }}
-                                className="absolute top-0 right-0 m-4 p-2 bg-gray-200 rounded-full hover:bg-gray-300 transition-colors"
-                                title="Fechar Painel"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        )}
+                                }
+                            }}
+                            className={`w-full flex items-center px-6 py-4 rounded-xl text-base font-semibold transition-all duration-300 transform
+                                ${abaAtiva === tab.id
+                                    ? 'bg-white text-blue-800 shadow-lg ring-2 ring-blue-400'
+                                    : 'text-blue-200 hover:bg-blue-700 hover:text-white hover:shadow-md hover:translate-x-1'
+                                }`}
+                        >
+                            <tab.icon className={`w-6 h-6 mr-4 ${abaAtiva === tab.id ? 'text-blue-600' : 'text-blue-300'}`} />
+                            {tab.label}
+                        </button>
+                    ))}
+                </aside>
 
-                        {/* Renderiza o conteúdo da aba ativa usando a função auxiliar */}
-                        {renderActiveTabContent()}
-                    </div>
+                {/* Conteúdo Principal - Removido rounded-xl e ajustado padding */}
+                <div className="flex-1 bg-white p-6 shadow-lg min-h-[calc(100vh-150px)]">
+                    {renderActiveTabContent()}
                 </div>
-            </main>
+            </div>
+        </main>
 
-            <ActionModal
-                isOpen={showDeleteCommentModal}
-                onClose={() => {
-                    setShowDeleteCommentModal(false);
-                    setIsDeletingComment(false);
-                    setCommentToDelete(null);
-                }}
-                title={`Excluir Comentário?`}
-                message={`Você tem certeza que deseja excluir este comentário? Esta ação é irreversível.`}
-                onConfirm={confirmDeleteComment}
-                confirmText={isDeletingComment ? <span className="flex items-center"><Loader2 className="animate-spin h-5 w-5 mr-2" /> Excluindo...</span> : 'Excluir'}
-                isConfirming={isDeletingComment}
-                type="danger"
-            />
-        </>
-    );
+        <ActionModal
+            isOpen={showDeleteCommentModal}
+            onClose={() => {
+                setShowDeleteCommentModal(false);
+                setIsDeletingComment(false);
+                setCommentToDelete(null);
+            }}
+            title={`Excluir Comentário?`}
+            message={`Você tem certeza que deseja excluir este comentário? Esta ação é irreversível.`}
+            onConfirm={confirmDeleteComment}
+            confirmText={isDeletingComment ? <span className="flex items-center"><Loader2 className="animate-spin h-5 w-5 mr-2" /> Excluindo...</span> : 'Excluir'}
+            isConfirming={isDeletingComment}
+            type="danger"
+        />
+    </>
+);
 }
 
 
